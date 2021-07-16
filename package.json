@@ -1,0 +1,62 @@
+{
+  "name": "@tilly-waci/server",
+  "version": "1.0.0",
+  "author": "Bloom Team <team@bloom.co> and Tilly team",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=14"
+  },
+  "scripts": {
+    "build": "npm run clean && ./bin/build",
+    "start": "./bin/start",
+    "db:migration:run": "./bin/migrate",
+    "db:migration:create": "typeorm migration:create -n",
+    "dev": "npm run clean && ./bin/dev",
+    "dev:reset": "./bin/dev-reset",
+    "clean": "rimraf build"
+  },
+  "dependencies": {
+    "@affinidi/vc-common": "^1.2.0",
+    "@affinidi/vc-data": "^1.2.3",
+    "@bloomprotocol/vc": "^0.1.3",
+    "@tilly-waci/shared": "file:shared",
+    "@tilly-waci/waci-core": "file:waci-core",
+    "@transmute/did-key-bls12381": "^0.2.1-unstable.35",
+    "@transmute/did-key-ed25519": "^0.2.1-unstable.35",
+    "@transmute/did-key-secp256k1": "^0.2.1-unstable.35",
+    "@transmute/did-key-web-crypto": "^0.3.0-unstable.2",
+    "@transmute/did-key-x25519": "^0.2.1-unstable.35",
+    "@transmute/did-key.js": "^0.3.0-unstable.2",
+    "@transmute/json-web-signature": "^0.7.0-unstable.2",
+    "@trust/keyto": "^1.0.1",
+    "@types/uuid": "^8.3.0",
+    "@types/ws": "^7.4.1",
+    "base64url": "^3.0.1",
+    "did-resolver": "^3.1.0",
+    "env-schema": "^3.0.1",
+    "fastify": "^3.14.2",
+    "fastify-auth": "^1.1.0",
+    "fastify-compress": "^3.4.2",
+    "fastify-cookie": "^5.3.0",
+    "fastify-cors": "^5.2.0",
+    "fastify-helmet": "^5.3.1",
+    "fastify-plugin": "^3.0.0",
+    "fastify-static": "^4.0.1",
+    "fluent-json-schema": "^2.0.4",
+    "jose": "^3.11.5",
+    "pg": "^8.6.0",
+    "query-string": "^7.0.0",
+    "typeorm": "^0.2.32",
+    "typeorm-naming-strategies": "^2.0.0",
+    "uuid": "^8.3.2",
+    "ws": "^7.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^14.14.41",
+    "ts-node": "^9.1.1",
+    "tsc-watch": "^4.2.9",
+    "tsconfig-paths": "^3.9.0",
+    "typescript": "^4.2.4"
+  }
+}
