@@ -15,8 +15,8 @@ const getEnv = () => {
             .prop('HOST', fluent_json_schema_1.default.string())
             .prop('DID_CONTROLLER', fluent_json_schema_1.default.string().required())
             .prop('DID_ID', fluent_json_schema_1.default.string().required())
-            .prop('DID_PUBLIC_KEY_BASE_58', fluent_json_schema_1.default.string().required())
-            .prop('DID_PRIVATE_KEY_BASE_58', fluent_json_schema_1.default.string().required())
+            .prop('DID_PUBLIC_KEY_HEX', fluent_json_schema_1.default.string().required())
+            .prop('DID_PRIVATE_KEY_HEX', fluent_json_schema_1.default.string().required())
             .prop('WACI_HOST', fluent_json_schema_1.default.string().required()),
         dotenv: true,
     });
@@ -28,8 +28,8 @@ const getEnv = () => {
         did: {
             controller: env.DID_CONTROLLER,
             id: env.DID_ID,
-            publicKeyBase58: env.DID_PUBLIC_KEY_BASE_58,
-            privateKeyBase58: env.DID_PRIVATE_KEY_BASE_58,
+            publicKeyHex: env.DID_PUBLIC_KEY_HEX,
+            privateKeyHex: env.DID_PRIVATE_KEY_HEX,
         },
         waciHost: env.WACI_HOST
     };

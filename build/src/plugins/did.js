@@ -14,29 +14,22 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.didPlugin = void 0;
 const fastify_plugin_1 = __importDefault(require("fastify-plugin"));
-const did_key_ed25519_1 = require("@transmute/did-key-ed25519");
 const parse_1 = require("jose/jwk/parse");
-const did_key_js_1 = require("@transmute/did-key.js");
+const ecdsa_secp256k1_verification_key_2019_1 = require("@bloomprotocol/ecdsa-secp256k1-verification-key-2019");
+const elem_did_legacy_non_anchored_1 = require("@bloomprotocol/elem-did-legacy-non-anchored");
 const did_resolver_1 = require("did-resolver");
+const base58 = require('base58-universal');
 const jsonld = require('jsonld');
-const pluginCallback = (fastify, { controller, id, publicKeyBase58, privateKeyBase58 }, done) => __awaiter(void 0, void 0, void 0, function* () {
-    const keyPair = did_key_ed25519_1.Ed25519KeyPair.from({
-        controller,
-        id,
-        type: 'Ed25519VerificationKey2018',
-        publicKeyBase58,
-        privateKeyBase58,
-    });
-    const resolveKeyDID = (did) => __awaiter(void 0, void 0, void 0, function* () {
-        const { didDocument } = yield did_key_js_1.resolve(did, { accept: 'application/did+ld+json' });
-        return {
-            didResolutionMetadata: {},
-            didDocument,
-            didDocumentMetadata: {}
-        };
+const pluginCallback = (fastify, { controller, id, publicKeyHex, privateKeyHex }, done) => __awaiter(void 0, void 0, void 0, function* () {
+    const keyPair = new ecdsa_secp256k1_verification_key_2019_1.EcdsaSecp256k1VerificationKey2019({
+        publicKeyBase58: base58.encode(Buffer.from(publicKeyHex, 'hex')),
+        privateKeyBase58: base58.encode(Buffer.from(privateKeyHex, 'hex')),
+        id: id,
+        controller: controller,
+        revoked: false
     });
     const resolveDID = (did) => {
-        return new did_resolver_1.Resolver({ key: resolveKeyDID }).resolve(did);
+        return new did_resolver_1.Resolver(elem_did_legacy_non_anchored_1.resolverRegistry).resolve(did);
     };
     const documentLoader = (url) => __awaiter(void 0, void 0, void 0, function* () {
         if (url.startsWith('did:')) {
@@ -53,7 +46,7 @@ const pluginCallback = (fastify, { controller, id, publicKeyBase58, privateKeyBa
     fastify.decorate('resolveDID', resolveDID);
     fastify.decorate('key', {
         keyPair,
-        keyLike: yield parse_1.parseJwk(yield keyPair.toJwk(true), 'EdDSA')
+        keyLike: yield parse_1.parseJwk(ecdsa_secp256k1_verification_key_2019_1.keyUtils.privateKeyJWKFrom.privateKeyBase58(keyPair.privateKeyBase58, id), 'ES256K')
     });
     done();
 });

@@ -1,5 +1,6 @@
 import S from 'fluent-json-schema'
-import { VPV1 } from '@affinidi/vc-common'
+import { VP } from '@bloomprotocol/vc';
+
 
 import { jwtRegex } from '../../../util'
 import { BaseSuccessReply, BaseFailReply, base4XXResponse, base200Response } from '../../base'
@@ -13,7 +14,7 @@ export type Params = unknown
 export type Headers = unknown
 
 export type SuccessReply = BaseSuccessReply & {
-  verifiable_presentation: VPV1
+  verifiable_presentation: VP
   redirectUrl?: string
   authToken?: string
 }

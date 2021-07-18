@@ -9,8 +9,8 @@ type UnmappedEnv = {
   NGROK_HOST?: string
   DID_CONTROLLER: string
   DID_ID: string
-  DID_PUBLIC_KEY_BASE_58: string
-  DID_PRIVATE_KEY_BASE_58: string
+  DID_PUBLIC_KEY_HEX: string
+  DID_PRIVATE_KEY_HEX: string
   WACI_HOST: string
 }
 
@@ -23,8 +23,8 @@ export const getEnv = () => {
       .prop('HOST', S.string())
       .prop('DID_CONTROLLER', S.string().required())
       .prop('DID_ID', S.string().required())
-      .prop('DID_PUBLIC_KEY_BASE_58', S.string().required())
-      .prop('DID_PRIVATE_KEY_BASE_58', S.string().required())
+      .prop('DID_PUBLIC_KEY_HEX', S.string().required())
+      .prop('DID_PRIVATE_KEY_HEX', S.string().required())
       .prop('WACI_HOST', S.string().required()),
     dotenv: true,
   }) as any
@@ -37,8 +37,8 @@ export const getEnv = () => {
     did: {
       controller: env.DID_CONTROLLER,
       id: env.DID_ID,
-      publicKeyBase58: env.DID_PUBLIC_KEY_BASE_58,
-      privateKeyBase58: env.DID_PRIVATE_KEY_BASE_58,
+      publicKeyHex: env.DID_PUBLIC_KEY_HEX,
+      privateKeyHex: env.DID_PRIVATE_KEY_HEX,
     },
     waciHost: env.WACI_HOST
 

@@ -1,7 +1,3 @@
-import { JsonWebKey, JsonWebSignature as  JsonWebSignatureBase, JsonWebSignatureOptions} from '@transmute/json-web-signature';
-import { buildVCV1, buildVCV1Skeleton, buildVCV1Unsigned, buildVPV1, buildVPV1Unsigned, validateVPV1 } from '@affinidi/vc-common';
-// import { base58  } from '@transmute/ed25519-key-pair/src/encoding'
-
 import { FastifyInstance } from 'fastify'
 import * as shared from '@tilly-waci/shared'
 import base64url from 'base64url';
@@ -10,14 +6,8 @@ import { SignJWT } from 'jose/jwt/sign';
 import { parseJwk } from 'jose/jwk/parse';
 import { JWTPayload } from 'jose/types';
 import { v4 as uuid } from 'uuid'
-import {VCAccountPersonV1 } from '@affinidi/vc-data';
 
-import { DIDDocument, parse } from 'did-resolver'
-import * as ed25519 from '@transmute/did-key-ed25519';
-import * as x25519 from '@transmute/did-key-x25519';
-import * as bls12381 from '@transmute/did-key-bls12381';
-import * as secp256k1 from '@transmute/did-key-secp256k1';
-import * as webCrypto from '@transmute/did-key-web-crypto';
+import {  parse } from 'did-resolver'
 
 import { verifyCredentialref, getCredentialref } from '@server/auth'
 import { clearCredentialrefCookie, clearWebSocketCookie, setCredentialrefCookie } from '@server/cookies'
@@ -27,81 +17,28 @@ import { Credentials } from '@server/entities/Credentials'
 import { isTokenUsed, useToken } from '@server/entities/UsedTokens';
 import { SignOfferChallengeJWT, offerResponseJwtVerify, SignRequestChallengeJWT, requestResponseJwtVerify } from '@server/waciJose'
 
+import { VC, signVC, VP, signVP, verifyVP } from '@bloomprotocol/vc';
+import { keyUtils, EcdsaSecp256k1VerificationKey2019 } from '@bloomprotocol/ecdsa-secp256k1-verification-key-2019'
+import { EcdsaSecp256k1Signature2019  } from '@bloomprotocol/ecdsa-secp256k1-signature-2019'
 
-class JsonWebSignature extends JsonWebSignatureBase {
-  constructor(options?: JsonWebSignatureOptions) {
-    super(options)
-    this.type = 'JsonWebSignature2020'
-  }
+const base58 = require('base58-universal')
 
-  async matchProof({proof}: any) {
-    return proof.type === 'https://w3id.org/security#JsonWebSignature2020' || proof.type === 'JsonWebSignature2020';
-  }
+// class EcdsaSecp256k1Signature2019 extends EcdsaSecp256k1Signature2019Base {
+//   constructor(options?: any) {
+//     super(options)
+//     this.type = 'EcdsaSecp256k1VerificationKey2019'
+//   }
 
-  async verifySignature({ verifyData, verificationMethod, proof }: any) {
-    return true;
-    // let { verifier }: any = this;
-
-    // if (!verifier) {
-    //   const key = await JsonWebKey.from(verificationMethod);
-    //   verifier = key.verifier();
-    // //   const key = await webCrypto.WebCryptoKey.from(verificationMethod);
-    // //   const j = await key.export({ type: 'JsonWebKey2020'})
-
-    // //  verifier = await webKp.jws.getDetachedJwsVerifier(
-    // //     await webKp.key.getCryptoKeyFromJsonWebKey2020({
-    // //       publicKeyJwk:j['publicKeyJwk'],
-    // //     })
-    // //   );
-    // }
-    // return verifier.verify({ data: verifyData, signature: proof.jws });
-  }
-}
+// }
 
 export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
   // *************************
   // Utils
   // *************************
 
-  const getPublicJwkForKey = async (did: string, keyId: string, didDoc: DIDDocument) => {
-    const idchar: any = did.split('did:key:').pop();
-    const encodedType = idchar.substring(0, 4);
-
-    const verificationMethod = didDoc.verificationMethod?.find(({id}) => keyId.includes(id))
-
-    if (typeof verificationMethod === 'undefined') {
-      throw new Error('Could not find publicKey for given keyId')
-    }
-
-    if (typeof verificationMethod.publicKeyBase58 === 'undefined') {
-      throw new Error('Could not find publicKey for given keyId')
-    }
-
-    switch (encodedType) {
-      case 'z6Mk':
-        return ed25519.Ed25519KeyPair.fromFingerprint({fingerprint: idchar}).toJwk()
-      case 'z6LS':
-        return x25519.X25519KeyPair.fromFingerprint({fingerprint: idchar})
-      case 'zUC7':
-        return (await bls12381.Bls12381G2KeyPair.fromFingerprint({fingerprint: idchar})).toJsonWebKeyPair().publicKeyJwk
-      case 'z3tE':
-        return (await bls12381.Bls12381G1KeyPair.fromFingerprint({fingerprint: idchar})).toJsonWebKeyPair().publicKeyJwk
-      case 'z5Tc':
-        throw new Error('Unsupported encoding type')
-      case 'zQ3s':
-        return secp256k1.Secp256k1KeyPair.fromFingerprint({fingerprint: idchar}).toJwk()
-      case 'zDna':
-      case 'z82L':
-      case 'z2J9':
-      case 'zXwp':
-      case 'zACH':
-      case 'zJss':
-        const k = await webCrypto.WebCryptoKey.fromFingerprint({fingerprint: idchar})
-        const j = await k.export({ type: 'JsonWebKey2020'})
-        return j['publicKeyJwk']
-      default:
-        throw new Error('Unsupported encoding type' + encodedType)
-    }
+  const getPublicJwkForKey = async (did: string, keyId: string, didDoc: any) => {
+    const l  = keyUtils.publicKeyJWKFrom.publicKeyHex(didDoc.publicKey[0]['publicKeyHex'], keyId)
+    return l
   }
 
   const getResponseTokenKey: JWTVerifyGetKey = async (header, token) => {
@@ -127,7 +64,7 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
       throw new Error('Cannot resolve DID Doc for issuer')
     }
 
-    if (didDocument.id.startsWith('did:key')) { 
+    if (didDocument.id.startsWith('did:elem')) { 
       const parsedjwk = await parseJwk(await getPublicJwkForKey(payload.iss, header.kid, didDocument), header.alg)
       return parsedjwk
     } else {
@@ -172,7 +109,7 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
                 },
                 description: {
                   text: req.query.credentialref,
-                  path: ['$.credentialSubject.data.hasAccount.identifier'],
+                  path: ['$.credentialSubject.@id'],
                 },
               },
             },
@@ -182,7 +119,7 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
         credentialref: req.query.credentialref,
         version: '0.1' as any
       })
-        .setProtectedHeader({alg: 'EdDSA', kid: app.key.keyPair.id})
+        .setProtectedHeader({alg: 'ES256K', kid: app.key.keyPair.id})
         .setSubject(req.query.token)
         .setJti(uuid())
         .setExpirationTime('30m')
@@ -242,7 +179,7 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
         })
       }
 
-      const {credentialref, credential_manifest } = result.challenge.payload
+      const {credentialref } = result.challenge.payload
 
       const credentialrefsRepo = Credentialrefs.getRepo()
 
@@ -267,93 +204,67 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
         })
       }
 
-      const credential = await buildVCV1({
-        unsigned: buildVCV1Unsigned({
-          skeleton: buildVCV1Skeleton({
-            context: Credential.context, 
-            holder: Credential.holder,
-            credentialSubject: Credential.credentialSubject,
-            type: Credential.type,
-            id: Credential.id
-          }),
-          issuanceDate: new Date().toISOString()
-        }),
-        issuer: {
-          did: app.key.keyPair.controller,
-          keyId: app.key.keyPair.id,
-          privateKey: '',
-        },
-        getSignSuite: async () => {
-          return new JsonWebSignature({
-            key: await JsonWebKey.from(app.key.keyPair.toJsonWebKeyPair(true)),
-          });
-        },
-        documentLoader: app.documentLoader,
-      })
+      const unsignedVC: Omit<VC, 'proof'> = {
+        '@context': Credential.context,
+        id: Credential.id,
+        type: Credential.type,
+        issuanceDate: new Date().toISOString(),
+        issuer: app.key.keyPair.controller,
+        credentialSubject: Credential.credentialSubject,
+      }
 
-      const unsignedVP = {
-        ...buildVPV1Unsigned({
-          id: `urn:uuid:${uuid()}`,
-          vcs: [credential],
-          holder: {
-            id: result.response.payload.iss!
-          },
-          context: [
-            'https://w3id.org/security/jws/v1',
-            {
+      const suite = new EcdsaSecp256k1Signature2019({
+        key: app.key.keyPair
+      });
+      
+      const credential = await signVC({
+        unsigned: unsignedVC,
+        suite: suite,
+        documentLoader: app.documentLoader,
+        addSuiteContext: false
+      }) 
+
+      const unsignedVP: Omit<VP, 'proof'> = {
+        '@context': ['https://www.w3.org/2018/credentials/v1',
+        {
+          '@version': 1.1,
+          CredentialFulfillment: {
+            '@id':
+              'https://identity.foundation/credential-manifest/#credential-fulfillment',
+            '@type': '@id',
+            '@context': {
               '@version': 1.1,
-              CredentialFulfillment: {
+              credential_fulfillment: {
                 '@id':
                   'https://identity.foundation/credential-manifest/#credential-fulfillment',
-                '@type': '@id',
-                '@context': {
-                  '@version': 1.1,
-                  credential_fulfillment: {
-                    '@id':
-                      'https://identity.foundation/credential-manifest/#credential-fulfillment',
-                    '@type': '@json',
-                  },
-                },
+                '@type': '@json',
               },
-            }
-          ],
-          type: 'CredentialFulfillment',
-        }),
-        credential_fulfillment: {
-          id: uuid(),
-          manifest_id: (credential_manifest as any).id,
-          descriptor_map: [
-            {
-              id: 'account_output',
-              format: 'ldp_vc',
-              path: '$.verifiableCredential[0]'
-            }
-          ],
-        },
-      }
-      const jsw = new JsonWebSignature({
-        key: await JsonWebKey.from(app.key.keyPair.toJsonWebKeyPair(true)),
-      })
-
-      const vp = await buildVPV1({
-        unsigned: unsignedVP,
+            },
+          },
+        }],
+        id: `urn:uuid:${uuid()}`,
+        type: 'VerifiablePresentation',
         holder: {
-          did: app.key.keyPair.controller,
-          keyId: app.key.keyPair.id,
-          privateKey: '',
+          id: result.response.payload.iss!
         },
-        getSignSuite: async () => jsw,
-        documentLoader: app.documentLoader,
-        getProofPurposeOptions: () => ({
+        verifiableCredential: [credential]
+      }
+      
+      
+      const vp = await signVP({
+        unsigned: unsignedVP,
+        suite: suite,
+        proofPurposeOptions: {
           challenge: uuid(),
           domain: 'https://credentials.tilly.africa'
-        })
+        },
+        documentLoader: app.documentLoader,
       })
 
       let redirectUrl: string | undefined
 
       const authToken = await new SignJWT({})
-        .setProtectedHeader({alg: 'EdDSA', kid: app.key.keyPair.id})
+        .setProtectedHeader({alg: 'ES256K', kid: app.key.keyPair.id})
         .setSubject(credentialrefId)
         .setExpirationTime('30m')
         .setIssuer(app.key.keyPair.controller)
@@ -411,7 +322,7 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
         callbackUrl: app.env.waciHost + `${shared.api.waci.request.submit.path}`,
         version: '1'
       })
-        .setProtectedHeader({alg: 'EdDSA', kid: app.key.keyPair.id})
+        .setProtectedHeader({alg: 'ES256K', kid: app.key.keyPair.id})
         .setSubject(req.query.token)
         .setJti(uuid())
         .setExpirationTime('30m')
@@ -472,53 +383,56 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
 
       const presentation: Object = result.response.payload['verifiable_presentation'] as Object
 
-      const validationResult = await validateVPV1({
-        documentLoader: app.documentLoader,
-        getVerifySuite: async ({controller, verificationMethod}) => {
-          const {didDocument} = await app.resolveDID(controller)
-          if (!didDocument) {
-            throw new Error('Cannot resolve DID Doc for controller')
-          }
+        const getSuite = async ({ verificationMethod, controller, proofType }: any) => {
+          switch (proofType) {
+            case 'EcdsaSecp256k1Signature2019':
+              if (controller.startsWith('did:elem') && controller.indexOf('elem:initial-state') >= 0) {
+                const {didDocument}: any = await app.resolveDID(controller)
+                if (!didDocument) throw new Error(`Could not resolve DID: ${controller}`)
 
-          const idchar: any = controller.split('did:key:').pop();
-          const encodedType = idchar.substring(0, 4);
-          let jws = undefined;
-          if (encodedType == 'z6Mk'){
-              try {
-                const id = didDocument.verificationMethod?.find(({id}) => verificationMethod.includes(id))
-                const key = await JsonWebKey.from({
-                  id: verificationMethod,
-                  type: "Ed25519VerificationKey2018",
-                  controller: controller,
-                  publicKeyBase58: id!.publicKeyBase58 as string,
-                  privateKeyBase58: id!.publicKeyBase58 as string,
-                });
-                jws = new JsonWebSignature({
-                  key: key,
-                });
-              } catch (error) {
-                console.log(error);
+                const jws  = new EcdsaSecp256k1Signature2019({ 
+                        key: EcdsaSecp256k1VerificationKey2019.from({
+                          controller, 
+                          id: verificationMethod,
+                          publicKeyBase58: base58.encode(Buffer.from(didDocument.publicKey[0]['publicKeyHex'], 'hex')),
+                          privateKeyBase58: base58.encode(Buffer.from(didDocument.publicKey[0]['publicKeyHex'], 'hex')),
+                        })
+                      });
+
+                return jws
               }
+        
+              return new EcdsaSecp256k1Signature2019()
+            default:
+              throw new Error(`Unsupported proofType: ${proofType}`)
           }
-          else{
-              const publicKeyJwk = await getPublicJwkForKey(controller, verificationMethod, didDocument)
-
-              jws = new JsonWebSignature({
-              key: await JsonWebKey.from({
-                id: verificationMethod,
-                controller,
-                type: 'JsonWebKey2020',
-                privateKeyJwk: publicKeyJwk,
-                publicKeyJwk: publicKeyJwk,
-              }),
-            });
+        }
+        
+        const getProofPurposeOptions = async ({controller, proofPurpose} : any) => {
+          switch (proofPurpose) {
+            case 'assertionMethod':
+            case 'authentication':
+              const { didDocument } = await app.resolveDID(controller)
+              if (controller.startsWith('did:elem') && controller.indexOf('elem:initial-state') >= 0) {
+                return {
+                  controller: didDocument,
+                }
+              }
+        
+              return {}
+            default:
+              throw new Error(`Unsupported proofPurpose: ${proofPurpose}`)
+          }
         }
 
-          return jws;
-        },
-      })(presentation as any)
+      const validationResult = await verifyVP({
+        vp: presentation, 
+        getSuite: getSuite, 
+        documentLoader: app.documentLoader,
+        getProofPurposeOptions: getProofPurposeOptions,
+      })
 
-      if (validationResult.kind === 'invalid') {
+      if (validationResult.success === false) {
         return reply.status(400).send({
           success: false,
           message: 'Invalid Presentation Submission'
@@ -528,13 +442,15 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
       let credentialrefId: string
 
       try {
-        const credential: VCAccountPersonV1 = validationResult.data.verifiableCredential[0] as any
+
+        const credential = validationResult.vp.verifiableCredential[0] as any
+
         const issuerDid = parse(credential.issuer)?.did
         const ourDid = parse(app.key.keyPair.controller)?.did
         if (!issuerDid || !ourDid || issuerDid !== ourDid) {
           throw new Error('Not issued by Tilly')
         }
-        const credentialref = credential.credentialSubject.data.hasAccount.identifier
+        const credentialref = credential.credentialSubject['@id']
         const Credentialref = await Credentialrefs.getRepo().findOneOrFail({where: {credentialref}})
         credentialrefId = Credentialref.id
       } catch {
@@ -545,7 +461,7 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
       }
 
       const authToken = await new SignJWT({})
-        .setProtectedHeader({alg: 'EdDSA', kid: app.key.keyPair.id})
+        .setProtectedHeader({alg: 'ES256K', kid: app.key.keyPair.id})
         .setSubject(credentialrefId)
         .setExpirationTime('30m')
         .setIssuer(app.key.keyPair.controller)

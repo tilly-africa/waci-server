@@ -1,43 +1,37 @@
 import fp from 'fastify-plugin'
 import { FastifyPluginCallback } from 'fastify'
-import { Ed25519KeyPair } from '@transmute/did-key-ed25519'
+
 import { KeyLike } from 'jose/types'
 import { parseJwk } from 'jose/jwk/parse'
-import { resolve  } from '@transmute/did-key.js';
-import { DIDResolutionResult, DIDResolver, Resolver } from 'did-resolver'
 
+import { EcdsaSecp256k1VerificationKey2019, keyUtils } from '@bloomprotocol/ecdsa-secp256k1-verification-key-2019'
+import {resolverRegistry} from '@bloomprotocol/elem-did-legacy-non-anchored'
+import { DIDResolutionResult, Resolver } from 'did-resolver'
+
+const base58 = require('base58-universal')
 const jsonld = require('jsonld')
 
 
 type DIDPluginOptions = {
   controller: string
   id: string
-  publicKeyBase58: string;
-  privateKeyBase58: string;
+  publicKeyHex: string;
+  privateKeyHex: string;
 }
 
-const pluginCallback: FastifyPluginCallback<DIDPluginOptions> = async (fastify, {controller, id, publicKeyBase58, privateKeyBase58}, done) => {
+const pluginCallback: FastifyPluginCallback<DIDPluginOptions> = async (fastify, {controller, id, publicKeyHex, privateKeyHex}, done) => {
 
-  const keyPair = Ed25519KeyPair.from({
-    controller,
-    id,
-    type: 'Ed25519VerificationKey2018',
-    publicKeyBase58,
-    privateKeyBase58,
+  const keyPair = new EcdsaSecp256k1VerificationKey2019({
+    publicKeyBase58: base58.encode(Buffer.from(publicKeyHex, 'hex')), 
+    privateKeyBase58: base58.encode(Buffer.from(privateKeyHex, 'hex')), 
+    id: id, 
+    controller: controller, 
+    revoked: false
   })
-
-  const resolveKeyDID: DIDResolver = async (did) => {
-    const {didDocument} = await resolve(did, {accept: 'application/did+ld+json'})
-
-    return {
-      didResolutionMetadata: {},
-      didDocument,
-      didDocumentMetadata: {}
-    }
-  }
+  
 
   const resolveDID = (did: string): Promise<DIDResolutionResult> => {
-    return new Resolver({key: resolveKeyDID}).resolve(did)
+    return new Resolver(resolverRegistry).resolve(did)
   }
 
   const documentLoader = async (url: string) => {
@@ -58,7 +52,7 @@ const pluginCallback: FastifyPluginCallback<DIDPluginOptions> = async (fastify, 
   fastify.decorate('resolveDID', resolveDID)
   fastify.decorate('key', {
     keyPair,
-    keyLike: await parseJwk(await keyPair.toJwk(true), 'EdDSA')
+    keyLike: await parseJwk(keyUtils.privateKeyJWKFrom.privateKeyBase58(keyPair.privateKeyBase58!, id), 'ES256K')
   })
 
   done()
@@ -69,7 +63,7 @@ export const didPlugin = fp<DIDPluginOptions>(pluginCallback, '3.x')
 declare module 'fastify' {
   interface FastifyInstance {
     key: {
-      keyPair: Ed25519KeyPair,
+      keyPair: EcdsaSecp256k1VerificationKey2019,
       keyLike: KeyLike
     },
     resolveDID: (did: string) => Promise<DIDResolutionResult>

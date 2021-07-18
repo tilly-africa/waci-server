@@ -1,6 +1,6 @@
 import { CredentialView } from '@tilly-waci/shared'
 import { Entity, Column, PrimaryColumn, Repository, CreateDateColumn, UpdateDateColumn } from 'typeorm'
-import {VCV1Holder, VCV1SubjectBaseMA, TContext} from '@affinidi/vc-common';
+import { VCProof, VCSubject } from '@bloomprotocol/vc';
 
 import { databaseManager } from '../database'
 
@@ -13,13 +13,13 @@ export class Credentials {
   type!: string | string []
 
   @Column({type: 'json'})
-  holder!: VCV1Holder;
+  holder!: Object;
 
   @Column({ name: 'credential_subject', type: 'json'})
-  credentialSubject!: VCV1SubjectBaseMA
+  credentialSubject!: VCSubject
 
   @Column({type: 'json'})
-  context!: TContext
+  context!: Object
 
   @Column({name: 'issuance_date',  nullable: true})
   issuanceDate!: Date
@@ -28,7 +28,7 @@ export class Credentials {
   issuer!: string
 
   @Column({type: 'json',  nullable: true})
-  proof!: Object
+  proof!: VCProof
 
   @CreateDateColumn({name: 'created_at'})
   createdAt!: Date
