@@ -17,19 +17,14 @@ import { Credentials } from '@server/entities/Credentials'
 import { isTokenUsed, useToken } from '@server/entities/UsedTokens';
 import { SignOfferChallengeJWT, offerResponseJwtVerify, SignRequestChallengeJWT, requestResponseJwtVerify } from '@server/waciJose'
 
-import { VC, signVC, VP, signVP, verifyVP } from '@bloomprotocol/vc';
+import { VC, signVC, VP, signVP, verifyVP, verifyVC } from '@bloomprotocol/vc';
 import { keyUtils, EcdsaSecp256k1VerificationKey2019 } from '@bloomprotocol/ecdsa-secp256k1-verification-key-2019'
 import { EcdsaSecp256k1Signature2019  } from '@bloomprotocol/ecdsa-secp256k1-signature-2019'
 
 const base58 = require('base58-universal')
 
-// class EcdsaSecp256k1Signature2019 extends EcdsaSecp256k1Signature2019Base {
-//   constructor(options?: any) {
-//     super(options)
-//     this.type = 'EcdsaSecp256k1VerificationKey2019'
-//   }
-
-// }
+// import { got} from 'got'
+// const jsonld = require('jsonld');
 
 export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
   // *************************
@@ -69,6 +64,48 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
       return parsedjwk
     } else {
       throw new Error('Unsupported DID Method')
+    }
+  }
+
+  const getSuite = async ({ verificationMethod, controller, proofType }: any) => {
+    switch (proofType) {
+      case 'EcdsaSecp256k1Signature2019':
+        if (controller.startsWith('did:elem') && controller.indexOf('elem:initial-state') >= 0) {
+          const {didDocument}: any = await app.resolveDID(controller)
+          if (!didDocument) throw new Error(`Could not resolve DID: ${controller}`)
+
+          const sig  = new EcdsaSecp256k1Signature2019({ 
+                  key: EcdsaSecp256k1VerificationKey2019.from({
+                    controller, 
+                    id: verificationMethod,
+                    publicKeyBase58: base58.encode(Buffer.from(didDocument.publicKey[0]['publicKeyHex'], 'hex')),
+                    privateKeyBase58: base58.encode(Buffer.from(didDocument.publicKey[0]['publicKeyHex'], 'hex')),
+                  })
+                });
+
+          return sig
+        }
+  
+        return new EcdsaSecp256k1Signature2019()
+      default:
+        throw new Error(`Unsupported proofType: ${proofType}`)
+    }
+  }
+  
+  const getProofPurposeOptions = async ({controller, proofPurpose} : any) => {
+    switch (proofPurpose) {
+      case 'assertionMethod':
+      case 'authentication':
+        const { didDocument } = await app.resolveDID(controller)
+        if (controller.startsWith('did:elem') && controller.indexOf('elem:initial-state') >= 0) {
+          return {
+            controller: didDocument,
+          }
+        }
+  
+        return {}
+      default:
+        throw new Error(`Unsupported proofPurpose: ${proofPurpose}`)
     }
   }
 
@@ -135,9 +172,6 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
 
   app.post<shared.api.waci.offer.submit.RouteInterface>(
     shared.api.waci.offer.submit.path,
-    {
-      schema: shared.api.waci.offer.submit.schema,
-    },
     async (req, reply) => {
       const isUsed = await isTokenUsed(req.body.responseToken)
 
@@ -211,6 +245,7 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
         issuanceDate: new Date().toISOString(),
         issuer: app.key.keyPair.controller,
         credentialSubject: Credential.credentialSubject,
+        holder: {id: result.response.payload.iss!}
       }
 
       const suite = new EcdsaSecp256k1Signature2019({
@@ -222,38 +257,30 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
         suite: suite,
         documentLoader: app.documentLoader,
         addSuiteContext: false
-      }) 
+      })
 
+      let validationResult = await verifyVC({vc: credential, 
+                documentLoader: app.documentLoader,
+                getSuite: getSuite, 
+                getProofPurposeOptions: getProofPurposeOptions
+              })
+      console.log(validationResult.success)
+      
       const unsignedVP: Omit<VP, 'proof'> = {
-        '@context': ['https://www.w3.org/2018/credentials/v1',
-        {
-          '@version': 1.1,
-          CredentialFulfillment: {
-            '@id':
-              'https://identity.foundation/credential-manifest/#credential-fulfillment',
-            '@type': '@id',
-            '@context': {
-              '@version': 1.1,
-              credential_fulfillment: {
-                '@id':
-                  'https://identity.foundation/credential-manifest/#credential-fulfillment',
-                '@type': '@json',
-              },
-            },
-          },
-        }],
+        '@context': ['https://www.w3.org/2018/credentials/v1'],
         id: `urn:uuid:${uuid()}`,
-        type: 'VerifiablePresentation',
+        type: ['VerifiablePresentation'],
         holder: {
-          id: result.response.payload.iss!
+          id:  app.key.keyPair.controller
         },
         verifiableCredential: [credential]
       }
       
-      
       const vp = await signVP({
         unsigned: unsignedVP,
-        suite: suite,
+        suite:  new EcdsaSecp256k1Signature2019({
+          key: app.key.keyPair
+        }),
         proofPurposeOptions: {
           challenge: uuid(),
           domain: 'https://credentials.tilly.africa'
@@ -261,6 +288,15 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
         documentLoader: app.documentLoader,
       })
 
+      let validationResult2 = await verifyVP({
+        vp: vp, 
+        getSuite: getSuite, 
+        documentLoader: app.documentLoader,
+        getProofPurposeOptions: getProofPurposeOptions,
+      })
+
+      console.log(validationResult2.success)
+      
       let redirectUrl: string | undefined
 
       const authToken = await new SignJWT({})
@@ -383,47 +419,14 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
 
       const presentation: Object = result.response.payload['verifiable_presentation'] as Object
 
-        const getSuite = async ({ verificationMethod, controller, proofType }: any) => {
-          switch (proofType) {
-            case 'EcdsaSecp256k1Signature2019':
-              if (controller.startsWith('did:elem') && controller.indexOf('elem:initial-state') >= 0) {
-                const {didDocument}: any = await app.resolveDID(controller)
-                if (!didDocument) throw new Error(`Could not resolve DID: ${controller}`)
+      const vc = presentation['verifiableCredential'][0]
+      const validationResult1 = await verifyVC({vc: vc, 
+        documentLoader: app.documentLoader,
+        getSuite: getSuite, 
+        getProofPurposeOptions: getProofPurposeOptions
+      })
 
-                const jws  = new EcdsaSecp256k1Signature2019({ 
-                        key: EcdsaSecp256k1VerificationKey2019.from({
-                          controller, 
-                          id: verificationMethod,
-                          publicKeyBase58: base58.encode(Buffer.from(didDocument.publicKey[0]['publicKeyHex'], 'hex')),
-                          privateKeyBase58: base58.encode(Buffer.from(didDocument.publicKey[0]['publicKeyHex'], 'hex')),
-                        })
-                      });
-
-                return jws
-              }
-        
-              return new EcdsaSecp256k1Signature2019()
-            default:
-              throw new Error(`Unsupported proofType: ${proofType}`)
-          }
-        }
-        
-        const getProofPurposeOptions = async ({controller, proofPurpose} : any) => {
-          switch (proofPurpose) {
-            case 'assertionMethod':
-            case 'authentication':
-              const { didDocument } = await app.resolveDID(controller)
-              if (controller.startsWith('did:elem') && controller.indexOf('elem:initial-state') >= 0) {
-                return {
-                  controller: didDocument,
-                }
-              }
-        
-              return {}
-            default:
-              throw new Error(`Unsupported proofPurpose: ${proofPurpose}`)
-          }
-        }
+      console.log(validationResult1.success)
 
       const validationResult = await verifyVP({
         vp: presentation, 
@@ -433,6 +436,7 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
       })
 
       if (validationResult.success === false) {
+        console.log(validationResult)
         return reply.status(400).send({
           success: false,
           message: 'Invalid Presentation Submission'

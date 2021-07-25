@@ -19,7 +19,7 @@ export class Credentials {
   credentialSubject!: VCSubject
 
   @Column({type: 'json'})
-  context!: Object
+  context!: Array<Object>
 
   @Column({name: 'issuance_date',  nullable: true})
   issuanceDate!: Date

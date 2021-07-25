@@ -48,7 +48,7 @@ __decorate([
 ], Credentials.prototype, "credentialSubject", void 0);
 __decorate([
     typeorm_1.Column({ type: 'json' }),
-    __metadata("design:type", Object)
+    __metadata("design:type", Array)
 ], Credentials.prototype, "context", void 0);
 __decorate([
     typeorm_1.Column({ name: 'issuance_date', nullable: true }),

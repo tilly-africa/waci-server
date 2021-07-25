@@ -21,7 +21,6 @@
     "prepare": "tsdx build"
   },
   "dependencies": {
-    "@affinidi/vc-common": "^1.2.0",
     "did-resolver": "^3.1.0",
     "fluent-json-schema": "^2.0.4"
   },

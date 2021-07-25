@@ -1,5 +1,5 @@
 import S from 'fluent-json-schema'
-import { VP } from '@bloomprotocol/vc';
+// import { VP } from '@bloomprotocol/vc';
 
 
 import { jwtRegex } from '../../../util'
@@ -14,7 +14,7 @@ export type Params = unknown
 export type Headers = unknown
 
 export type SuccessReply = BaseSuccessReply & {
-  verifiable_presentation: VP
+  verifiable_presentation: any
   redirectUrl?: string
   authToken?: string
 }

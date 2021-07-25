@@ -49,12 +49,8 @@ const vc_1 = require("@bloomprotocol/vc");
 const ecdsa_secp256k1_verification_key_2019_1 = require("@bloomprotocol/ecdsa-secp256k1-verification-key-2019");
 const ecdsa_secp256k1_signature_2019_1 = require("@bloomprotocol/ecdsa-secp256k1-signature-2019");
 const base58 = require('base58-universal');
-// class EcdsaSecp256k1Signature2019 extends EcdsaSecp256k1Signature2019Base {
-//   constructor(options?: any) {
-//     super(options)
-//     this.type = 'EcdsaSecp256k1VerificationKey2019'
-//   }
-// }
+// import { got} from 'got'
+// const jsonld = require('jsonld');
 const applyCredentialrefRoutes = (app) => {
     // *************************
     // Utils
@@ -87,6 +83,43 @@ const applyCredentialrefRoutes = (app) => {
         }
         else {
             throw new Error('Unsupported DID Method');
+        }
+    });
+    const getSuite = ({ verificationMethod, controller, proofType }) => __awaiter(void 0, void 0, void 0, function* () {
+        switch (proofType) {
+            case 'EcdsaSecp256k1Signature2019':
+                if (controller.startsWith('did:elem') && controller.indexOf('elem:initial-state') >= 0) {
+                    const { didDocument } = yield app.resolveDID(controller);
+                    if (!didDocument)
+                        throw new Error(`Could not resolve DID: ${controller}`);
+                    const sig = new ecdsa_secp256k1_signature_2019_1.EcdsaSecp256k1Signature2019({
+                        key: ecdsa_secp256k1_verification_key_2019_1.EcdsaSecp256k1VerificationKey2019.from({
+                            controller,
+                            id: verificationMethod,
+                            publicKeyBase58: base58.encode(Buffer.from(didDocument.publicKey[0]['publicKeyHex'], 'hex')),
+                            privateKeyBase58: base58.encode(Buffer.from(didDocument.publicKey[0]['publicKeyHex'], 'hex')),
+                        })
+                    });
+                    return sig;
+                }
+                return new ecdsa_secp256k1_signature_2019_1.EcdsaSecp256k1Signature2019();
+            default:
+                throw new Error(`Unsupported proofType: ${proofType}`);
+        }
+    });
+    const getProofPurposeOptions = ({ controller, proofPurpose }) => __awaiter(void 0, void 0, void 0, function* () {
+        switch (proofPurpose) {
+            case 'assertionMethod':
+            case 'authentication':
+                const { didDocument } = yield app.resolveDID(controller);
+                if (controller.startsWith('did:elem') && controller.indexOf('elem:initial-state') >= 0) {
+                    return {
+                        controller: didDocument,
+                    };
+                }
+                return {};
+            default:
+                throw new Error(`Unsupported proofPurpose: ${proofPurpose}`);
         }
     });
     // *************************
@@ -143,9 +176,7 @@ const applyCredentialrefRoutes = (app) => {
             challengeToken
         });
     }));
-    app.post(shared.api.waci.offer.submit.path, {
-        schema: shared.api.waci.offer.submit.schema,
-    }, (req, reply) => __awaiter(void 0, void 0, void 0, function* () {
+    app.post(shared.api.waci.offer.submit.path, (req, reply) => __awaiter(void 0, void 0, void 0, function* () {
         const isUsed = yield UsedTokens_1.isTokenUsed(req.body.responseToken);
         if (isUsed) {
             return reply.status(400).send({
@@ -208,6 +239,7 @@ const applyCredentialrefRoutes = (app) => {
             issuanceDate: new Date().toISOString(),
             issuer: app.key.keyPair.controller,
             credentialSubject: Credential.credentialSubject,
+            holder: { id: result.response.payload.iss }
         };
         const suite = new ecdsa_secp256k1_signature_2019_1.EcdsaSecp256k1Signature2019({
             key: app.key.keyPair
@@ -218,38 +250,39 @@ const applyCredentialrefRoutes = (app) => {
             documentLoader: app.documentLoader,
             addSuiteContext: false
         });
+        let validationResult = yield vc_1.verifyVC({ vc: credential,
+            documentLoader: app.documentLoader,
+            getSuite: getSuite,
+            getProofPurposeOptions: getProofPurposeOptions
+        });
+        console.log(validationResult.success);
         const unsignedVP = {
-            '@context': ['https://www.w3.org/2018/credentials/v1',
-                {
-                    '@version': 1.1,
-                    CredentialFulfillment: {
-                        '@id': 'https://identity.foundation/credential-manifest/#credential-fulfillment',
-                        '@type': '@id',
-                        '@context': {
-                            '@version': 1.1,
-                            credential_fulfillment: {
-                                '@id': 'https://identity.foundation/credential-manifest/#credential-fulfillment',
-                                '@type': '@json',
-                            },
-                        },
-                    },
-                }],
+            '@context': ['https://www.w3.org/2018/credentials/v1'],
             id: `urn:uuid:${uuid_1.v4()}`,
-            type: 'VerifiablePresentation',
+            type: ['VerifiablePresentation'],
             holder: {
-                id: result.response.payload.iss
+                id: app.key.keyPair.controller
             },
             verifiableCredential: [credential]
         };
         const vp = yield vc_1.signVP({
             unsigned: unsignedVP,
-            suite: suite,
+            suite: new ecdsa_secp256k1_signature_2019_1.EcdsaSecp256k1Signature2019({
+                key: app.key.keyPair
+            }),
             proofPurposeOptions: {
                 challenge: uuid_1.v4(),
                 domain: 'https://credentials.tilly.africa'
             },
             documentLoader: app.documentLoader,
         });
+        let validationResult2 = yield vc_1.verifyVP({
+            vp: vp,
+            getSuite: getSuite,
+            documentLoader: app.documentLoader,
+            getProofPurposeOptions: getProofPurposeOptions,
+        });
+        console.log(validationResult2.success);
         let redirectUrl;
         const authToken = yield new sign_1.SignJWT({})
             .setProtectedHeader({ alg: 'ES256K', kid: app.key.keyPair.id })
@@ -348,43 +381,13 @@ const applyCredentialrefRoutes = (app) => {
             });
         }
         const presentation = result.response.payload['verifiable_presentation'];
-        const getSuite = ({ verificationMethod, controller, proofType }) => __awaiter(void 0, void 0, void 0, function* () {
-            switch (proofType) {
-                case 'EcdsaSecp256k1Signature2019':
-                    if (controller.startsWith('did:elem') && controller.indexOf('elem:initial-state') >= 0) {
-                        const { didDocument } = yield app.resolveDID(controller);
-                        if (!didDocument)
-                            throw new Error(`Could not resolve DID: ${controller}`);
-                        const jws = new ecdsa_secp256k1_signature_2019_1.EcdsaSecp256k1Signature2019({
-                            key: ecdsa_secp256k1_verification_key_2019_1.EcdsaSecp256k1VerificationKey2019.from({
-                                controller,
-                                id: verificationMethod,
-                                publicKeyBase58: base58.encode(Buffer.from(didDocument.publicKey[0]['publicKeyHex'], 'hex')),
-                                privateKeyBase58: base58.encode(Buffer.from(didDocument.publicKey[0]['publicKeyHex'], 'hex')),
-                            })
-                        });
-                        return jws;
-                    }
-                    return new ecdsa_secp256k1_signature_2019_1.EcdsaSecp256k1Signature2019();
-                default:
-                    throw new Error(`Unsupported proofType: ${proofType}`);
-            }
+        const vc = presentation['verifiableCredential'][0];
+        const validationResult1 = yield vc_1.verifyVC({ vc: vc,
+            documentLoader: app.documentLoader,
+            getSuite: getSuite,
+            getProofPurposeOptions: getProofPurposeOptions
         });
-        const getProofPurposeOptions = ({ controller, proofPurpose }) => __awaiter(void 0, void 0, void 0, function* () {
-            switch (proofPurpose) {
-                case 'assertionMethod':
-                case 'authentication':
-                    const { didDocument } = yield app.resolveDID(controller);
-                    if (controller.startsWith('did:elem') && controller.indexOf('elem:initial-state') >= 0) {
-                        return {
-                            controller: didDocument,
-                        };
-                    }
-                    return {};
-                default:
-                    throw new Error(`Unsupported proofPurpose: ${proofPurpose}`);
-            }
-        });
+        console.log(validationResult1.success);
         const validationResult = yield vc_1.verifyVP({
             vp: presentation,
             getSuite: getSuite,

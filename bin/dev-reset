@@ -14,8 +14,8 @@ if is_production; then
 fi
 
 echo "-- Server Reset DB --"
-dropdb --if-exists waci-demo-dev
-createdb waci-demo-dev
+dropdb --if-exists tilly_waci
+createdb tilly_waci
 
 ./bin/build
 ./bin/migrate
