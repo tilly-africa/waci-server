@@ -30,7 +30,7 @@ export class createCredentials1617047418834 implements MigrationInterface {
           },
           {
             name: 'issuance_date',
-            type: 'timestamp',
+            type: 'varchar',
             isNullable: true
           },
           {

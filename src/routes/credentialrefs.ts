@@ -17,7 +17,7 @@ import { Credentials } from '@server/entities/Credentials'
 import { isTokenUsed, useToken } from '@server/entities/UsedTokens';
 import { SignOfferChallengeJWT, offerResponseJwtVerify, SignRequestChallengeJWT, requestResponseJwtVerify } from '@server/waciJose'
 
-import { VC, signVC, VP, signVP, verifyVP, verifyVC } from '@bloomprotocol/vc';
+import { VC, signVC, VP, signVP, verifyVP} from '@bloomprotocol/vc';
 import { keyUtils, EcdsaSecp256k1VerificationKey2019 } from '@bloomprotocol/ecdsa-secp256k1-verification-key-2019'
 import { EcdsaSecp256k1Signature2019  } from '@bloomprotocol/ecdsa-secp256k1-signature-2019'
 
@@ -258,13 +258,6 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
         documentLoader: app.documentLoader,
         addSuiteContext: false
       })
-
-      let validationResult = await verifyVC({vc: credential, 
-                documentLoader: app.documentLoader,
-                getSuite: getSuite, 
-                getProofPurposeOptions: getProofPurposeOptions
-              })
-      console.log(validationResult.success)
       
       const unsignedVP: Omit<VP, 'proof'> = {
         '@context': ['https://www.w3.org/2018/credentials/v1'],
@@ -288,15 +281,6 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
         documentLoader: app.documentLoader,
       })
 
-      let validationResult2 = await verifyVP({
-        vp: vp, 
-        getSuite: getSuite, 
-        documentLoader: app.documentLoader,
-        getProofPurposeOptions: getProofPurposeOptions,
-      })
-
-      console.log(validationResult2.success)
-      
       let redirectUrl: string | undefined
 
       const authToken = await new SignJWT({})
@@ -419,15 +403,6 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
 
       const presentation: Object = result.response.payload['verifiable_presentation'] as Object
 
-      const vc = presentation['verifiableCredential'][0]
-      const validationResult1 = await verifyVC({vc: vc, 
-        documentLoader: app.documentLoader,
-        getSuite: getSuite, 
-        getProofPurposeOptions: getProofPurposeOptions
-      })
-
-      console.log(validationResult1.success)
-
       const validationResult = await verifyVP({
         vp: presentation, 
         getSuite: getSuite, 
@@ -436,7 +411,7 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
       })
 
       if (validationResult.success === false) {
-        console.log(validationResult)
+        console.log(JSON.stringify(validationResult))
         return reply.status(400).send({
           success: false,
           message: 'Invalid Presentation Submission'
@@ -454,7 +429,7 @@ export const applyCredentialrefRoutes = (app: FastifyInstance): void => {
         if (!issuerDid || !ourDid || issuerDid !== ourDid) {
           throw new Error('Not issued by Tilly')
         }
-        const credentialref = credential.credentialSubject['@id']
+        const credentialref = credential.credentialSubject['id'].replace('urn:uuid:', '')
         const Credentialref = await Credentialrefs.getRepo().findOneOrFail({where: {credentialref}})
         credentialrefId = Credentialref.id
       } catch {

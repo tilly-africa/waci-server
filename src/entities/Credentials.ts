@@ -22,7 +22,7 @@ export class Credentials {
   context!: Array<Object>
 
   @Column({name: 'issuance_date',  nullable: true})
-  issuanceDate!: Date
+  issuanceDate!: string
 
   @Column({ nullable: true,})
   issuer!: string

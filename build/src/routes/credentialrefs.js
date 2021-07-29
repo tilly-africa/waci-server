@@ -250,12 +250,6 @@ const applyCredentialrefRoutes = (app) => {
             documentLoader: app.documentLoader,
             addSuiteContext: false
         });
-        let validationResult = yield vc_1.verifyVC({ vc: credential,
-            documentLoader: app.documentLoader,
-            getSuite: getSuite,
-            getProofPurposeOptions: getProofPurposeOptions
-        });
-        console.log(validationResult.success);
         const unsignedVP = {
             '@context': ['https://www.w3.org/2018/credentials/v1'],
             id: `urn:uuid:${uuid_1.v4()}`,
@@ -276,13 +270,6 @@ const applyCredentialrefRoutes = (app) => {
             },
             documentLoader: app.documentLoader,
         });
-        let validationResult2 = yield vc_1.verifyVP({
-            vp: vp,
-            getSuite: getSuite,
-            documentLoader: app.documentLoader,
-            getProofPurposeOptions: getProofPurposeOptions,
-        });
-        console.log(validationResult2.success);
         let redirectUrl;
         const authToken = yield new sign_1.SignJWT({})
             .setProtectedHeader({ alg: 'ES256K', kid: app.key.keyPair.id })
@@ -381,13 +368,6 @@ const applyCredentialrefRoutes = (app) => {
             });
         }
         const presentation = result.response.payload['verifiable_presentation'];
-        const vc = presentation['verifiableCredential'][0];
-        const validationResult1 = yield vc_1.verifyVC({ vc: vc,
-            documentLoader: app.documentLoader,
-            getSuite: getSuite,
-            getProofPurposeOptions: getProofPurposeOptions
-        });
-        console.log(validationResult1.success);
         const validationResult = yield vc_1.verifyVP({
             vp: presentation,
             getSuite: getSuite,
@@ -395,6 +375,7 @@ const applyCredentialrefRoutes = (app) => {
             getProofPurposeOptions: getProofPurposeOptions,
         });
         if (validationResult.success === false) {
+            console.log(JSON.stringify(validationResult));
             return reply.status(400).send({
                 success: false,
                 message: 'Invalid Presentation Submission'
@@ -408,7 +389,7 @@ const applyCredentialrefRoutes = (app) => {
             if (!issuerDid || !ourDid || issuerDid !== ourDid) {
                 throw new Error('Not issued by Tilly');
             }
-            const credentialref = credential.credentialSubject['@id'];
+            const credentialref = credential.credentialSubject['id'].replace('urn:uuid:', '');
             const Credentialref = yield Credentialrefs_1.Credentialrefs.getRepo().findOneOrFail({ where: { credentialref } });
             credentialrefId = Credentialref.id;
         }

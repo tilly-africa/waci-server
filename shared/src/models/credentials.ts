@@ -6,7 +6,7 @@ export type CredentialView = {
   credentialSubject: Object;
   holder: Object;
   context: Array<Object>;
-  issuanceDate: Date;
+  issuanceDate: String;
   issuer: string;
   proof: Object;
   updatedAt: string

@@ -52,7 +52,7 @@ __decorate([
 ], Credentials.prototype, "context", void 0);
 __decorate([
     typeorm_1.Column({ name: 'issuance_date', nullable: true }),
-    __metadata("design:type", Date)
+    __metadata("design:type", String)
 ], Credentials.prototype, "issuanceDate", void 0);
 __decorate([
     typeorm_1.Column({ nullable: true, }),
