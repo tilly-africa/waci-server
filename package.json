@@ -51,6 +51,7 @@
   },
   "devDependencies": {
     "@types/node": "^14.14.41",
+    "lerna": "^4.0.0",
     "ts-node": "^9.1.1",
     "tsc-watch": "^4.2.9",
     "tsconfig-paths": "^3.9.0",
