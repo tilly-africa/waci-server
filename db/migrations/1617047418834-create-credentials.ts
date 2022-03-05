@@ -13,19 +13,11 @@ export class createCredentials1617047418834 implements MigrationInterface {
             isUnique: true,
           },
           {
-            name: 'type',
+            name: 'credentialobject',
             type: 'json',
           },
           {
             name: 'holder',
-            type: 'json',
-          },
-          {
-            name: 'context',
-            type: 'json',
-          },
-          {
-            name: 'credential_subject',
             type: 'json',
           },
           {
@@ -36,11 +28,6 @@ export class createCredentials1617047418834 implements MigrationInterface {
           {
             name: 'issuer',
             type: 'varchar',
-            isNullable: true
-          },
-          {
-            name: 'proof',
-            type: 'json',
             isNullable: true
           },
           {

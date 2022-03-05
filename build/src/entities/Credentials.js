@@ -17,13 +17,10 @@ let Credentials = Credentials_1 = class Credentials {
     constructor() {
         this.toView = () => ({
             id: this.id,
-            type: this.type,
+            credentialobject: this.credentialobject,
             holder: this.holder,
-            credentialSubject: this.credentialSubject,
-            context: this.context,
             issuanceDate: this.issuanceDate,
             issuer: this.issuer,
-            proof: this.proof,
             createdAt: this.createdAt.toISOString(),
             updatedAt: this.updatedAt.toISOString(),
         });
@@ -37,19 +34,11 @@ __decorate([
 __decorate([
     typeorm_1.Column({ type: 'json' }),
     __metadata("design:type", Object)
-], Credentials.prototype, "type", void 0);
+], Credentials.prototype, "credentialobject", void 0);
 __decorate([
     typeorm_1.Column({ type: 'json' }),
     __metadata("design:type", Object)
 ], Credentials.prototype, "holder", void 0);
-__decorate([
-    typeorm_1.Column({ name: 'credential_subject', type: 'json' }),
-    __metadata("design:type", Object)
-], Credentials.prototype, "credentialSubject", void 0);
-__decorate([
-    typeorm_1.Column({ type: 'json' }),
-    __metadata("design:type", Array)
-], Credentials.prototype, "context", void 0);
 __decorate([
     typeorm_1.Column({ name: 'issuance_date', nullable: true }),
     __metadata("design:type", String)
@@ -58,10 +47,6 @@ __decorate([
     typeorm_1.Column({ nullable: true, }),
     __metadata("design:type", String)
 ], Credentials.prototype, "issuer", void 0);
-__decorate([
-    typeorm_1.Column({ type: 'json', nullable: true }),
-    __metadata("design:type", Object)
-], Credentials.prototype, "proof", void 0);
 __decorate([
     typeorm_1.CreateDateColumn({ name: 'created_at' }),
     __metadata("design:type", Date)
