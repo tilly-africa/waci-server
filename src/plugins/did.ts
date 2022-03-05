@@ -44,6 +44,7 @@ const pluginCallback: FastifyPluginCallback<DIDPluginOptions> = async (fastify, 
         documentUrl: url,
       }
     }
+    console.log(url)
 
     return jsonld.documentLoaders.node()(url)
   }

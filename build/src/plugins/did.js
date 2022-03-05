@@ -40,6 +40,7 @@ const pluginCallback = (fastify, { controller, id, publicKeyHex, privateKeyHex }
                 documentUrl: url,
             };
         }
+        console.log(url);
         return jsonld.documentLoaders.node()(url);
     });
     fastify.decorate('documentLoader', documentLoader);
